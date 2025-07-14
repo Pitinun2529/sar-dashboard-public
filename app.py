@@ -32,10 +32,8 @@ st.set_page_config(
 # Enhanced CSS for production
 st.markdown("""
 <style>
-    /* Import Google Fonts */
     @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
     
-    /* Global Styles */
     .stApp {
         font-family: 'Prompt', sans-serif;
     }
@@ -103,7 +101,6 @@ st.markdown("""
         margin: 1rem 0;
     }
     
-    /* Loading Animation */
     .loading-spinner {
         display: inline-block;
         width: 20px;
@@ -119,7 +116,6 @@ st.markdown("""
         100% { transform: rotate(360deg); }
     }
     
-    /* Responsive Design */
     @media (max-width: 768px) {
         .main-header {
             padding: 1.5rem;
@@ -132,17 +128,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------ CONFIGURATION WITH ENVIRONMENT VARIABLES ----------------
-# ใช้ Environment Variables หรือ Streamlit Secrets
 try:
-    # สำหรับ Streamlit Cloud
     MAIN_SHEET_ID = st.secrets.get("GOOGLE_SHEET_ID", "1E5Eo7DkgY0XYxCLcY9II5vH_citjCNcCJ9QBPIAs-BY")
 except:
-    # สำหรับ Local Development
     MAIN_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "1E5Eo7DkgY0XYxCLcY9II5vH_citjCNcCJ9QBPIAs-BY")
 
-YEARS = list(range(2567, 2579))  # 2567-2578 (12 years)
+YEARS = list(range(2567, 2579))
 
-# Configuration สำหรับแต่ละปี - ระบุ gid สำหรับแต่ละปี
 SHEET_CONFIGS = {
     2567: "0",
     2568: "391457022",
@@ -168,7 +160,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------ ERROR HANDLING & LOGGING ----------------
-@st.cache_data(ttl=600)  # เพิ่มเวลา cache สำหรับ production
+@st.cache_data(ttl=600)
 def load_year_data_production(year):
     """โหลดข้อมูลสำหรับปีที่กำหนด พร้อม Error Handling ขั้นสูง"""
     try:
@@ -178,7 +170,6 @@ def load_year_data_production(year):
             st.error(f"⚠️ ไม่พบการกำหนดค่า gid สำหรับปี {year}")
             return None
         
-        # แสดง Loading State
         with st.spinner(f'🔄 กำลังโหลดข้อมูลปี {year}...'):
             sheet_url = f"https://docs.google.com/spreadsheets/d/{MAIN_SHEET_ID}/export?format=csv&gid={gid}"
             
@@ -189,11 +180,9 @@ def load_year_data_production(year):
                     st.warning(f"⚠️ แผ่นงาน gid={gid} ว่างเปล่า")
                     return None
                 
-                # Data Cleaning
                 df = df.dropna(subset=["ภารกิจ"])
                 df.columns = df.columns.str.strip()
                 
-                # Score Processing
                 score_column = None
                 for col in ["ระดับคะแนนแต่ละภารกิจ", "คะแนน", "Score"]:
                     if col in df.columns:
@@ -207,7 +196,6 @@ def load_year_data_production(year):
                     st.error(f"❌ ไม่พบคอลัมน์คะแนนในข้อมูลปี {year}")
                     return None
                 
-                # Standard Assignment
                 df["มาตรฐาน"] = ""
                 for idx, row in df.iterrows():
                     actual_row = idx + 2
@@ -247,25 +235,24 @@ def load_year_data_production(year):
 with st.sidebar:
     st.markdown("""
     <div class="sidebar-section">
-        <h3>🎛️ การควบคุมแดشบอร์ด</h3>
+        <h3>🎛️ การควบคุมแดชบอร์ด</h3>
         <p><strong>สถานะ:</strong> 🟢 Online</p>
         <p><strong>อัปเดต:</strong> """ + datetime.now().strftime("%d/%m/%Y %H:%M") + """</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Connection Test
     if st.button("🔍 ทดสอบการเชื่อมต่อ", key="connection_test"):
         with st.spinner("กำลังทดสอบ..."):
             total_connections = 0
             successful_connections = 0
             
-            for year in YEARS[:3]:  # ทดสอบแค่ 3 ปีแรกเพื่อประหยัดเวลา
+            for year in YEARS[:3]:
                 gid = SHEET_CONFIGS.get(year)
                 total_connections += 1
                 
                 try:
                     test_url = f"https://docs.google.com/spreadsheets/d/{MAIN_SHEET_ID}/export?format=csv&gid={gid}"
-                    test_df = pd.read_csv(test_url, nrows=1)  # อ่านแค่แถวแรกเพื่อทดสอบ
+                    test_df = pd.read_csv(test_url, nrows=1)
                     successful_connections += 1
                     st.success(f"✅ ปี {year}: เชื่อมต่อสำเร็จ")
                 except:
@@ -388,7 +375,6 @@ if not df.empty:
 # ------------ MAIN DASHBOARD CONTENT ----------------
 st.markdown("## 📈 ตัวชี้วัดหลัก")
 
-# KPIs
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
@@ -437,7 +423,6 @@ with col4:
 # ------------ VISUALIZATION ----------------
 st.markdown("## 📊 การวิเคราะห์ข้อมูล")
 
-# Chart selection
 viz_type = st.selectbox(
     "เลือกประเภทการแสดงผล",
     ["📊 ภาพรวม", "📈 แนวโน้ม", "🎯 เปรียบเทียบมาตรฐาน", "📋 ตารางข้อมูล"]
@@ -450,156 +435,7 @@ if viz_type == "📊 ภาพรวม":
         if "มาตรฐาน" in df.columns and "คะแนน" in df.columns:
             avg_by_standard = df.groupby("มาตรฐาน")["คะแนน"].mean().reset_index()
             
-            fig_radar.update_layout(
-            polar=dict(
-                radialaxis=dict(
-                    visible=True,
-                    range=[0, 5]
-                )
-            ),
-            showlegend=True,
-            title="Radar Chart เปรียบเทียบมาตรฐาน",
-            template=chart_theme,
-            height=500
-        )
-        
-        st.plotly_chart(fig_radar, use_container_width=True)
-
-elif viz_type == "📋 ตารางข้อมูล":
-    st.markdown("### 📋 ข้อมูลรายละเอียด")
-    
-    # Filters
-    filter_col1, filter_col2, filter_col3 = st.columns(3)
-    
-    with filter_col1:
-        if "มาตรฐาน" in df.columns:
-            standard_filter = st.selectbox(
-                "🎯 มาตรฐาน",
-                ["ทั้งหมด"] + list(df["มาตรฐาน"].unique())
-            )
-        else:
-            standard_filter = "ทั้งหมด"
-    
-    with filter_col2:
-        if "สถานะ" in df.columns:
-            status_filter = st.selectbox(
-                "📊 สถานะ",
-                ["ทั้งหมด"] + list(df["สถานะ"].unique())
-            )
-        else:
-            status_filter = "ทั้งหมด"
-    
-    with filter_col3:
-        if len(selected_years) > 1:
-            year_filter = st.selectbox(
-                "📅 ปี",
-                ["ทั้งหมด"] + selected_years
-            )
-        else:
-            year_filter = "ทั้งหมด"
-    
-    # Apply filters
-    filtered_df = df.copy()
-    
-    if standard_filter != "ทั้งหมด":
-        filtered_df = filtered_df[filtered_df["มาตรฐาน"] == standard_filter]
-    
-    if status_filter != "ทั้งหมด":
-        filtered_df = filtered_df[filtered_df["สถานะ"] == status_filter]
-    
-    if year_filter != "ทั้งหมด":
-        filtered_df = filtered_df[filtered_df["ปี"] == year_filter]
-    
-    # Display filtered data
-    if not filtered_df.empty:
-        display_cols = ["ปี", "มาตรฐาน", "ภารกิจ", "คะแนน", "สถานะ"]
-        available_cols = [col for col in display_cols if col in filtered_df.columns]
-        
-        st.dataframe(
-            filtered_df[available_cols].sort_values("คะแนน", ascending=False),
-            use_container_width=True,
-            height=400
-        )
-        
-        st.info(f"📊 แสดง {len(filtered_df)} จาก {len(df)} รายการ")
-    else:
-        st.warning("ไม่พบข้อมูลที่ตรงกับเงื่อนไข")
-
-# ------------ EXPORT SECTION ----------------
-st.markdown("## 📥 ส่งออกข้อมูล")
-
-export_col1, export_col2 = st.columns(2)
-
-with export_col1:
-    if st.button("📊 ส่งออก Excel", use_container_width=True):
-        output = BytesIO()
-        
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            # Main data
-            df.to_excel(writer, index=False, sheet_name='ข้อมูลหลัก')
-            
-            # Summary
-            if "มาตรฐาน" in df.columns:
-                summary = df.groupby("มาตรฐาน")["คะแนน"].agg([
-                    'count', 'mean', 'min', 'max', 'std'
-                ]).round(2)
-                summary.to_excel(writer, sheet_name='สรุป')
-        
-        st.download_button(
-            label="📥 ดาวน์โหลด Excel",
-            data=output.getvalue(),
-            file_name=f"SAR_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-with export_col2:
-    if st.button("📋 ส่งออก CSV", use_container_width=True):
-        csv_data = df.to_csv(index=False, encoding='utf-8-sig')
-        
-        st.download_button(
-            label="📥 ดาวน์โหลด CSV",
-            data=csv_data,
-            file_name=f"SAR_Data_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-            mime="text/csv"
-        )
-
-# ------------ FOOTER ----------------
-st.markdown("---")
-
-footer_col1, footer_col2, footer_col3 = st.columns(3)
-
-with footer_col1:
-    st.markdown("""
-    **📊 SAR Dashboard**
-    
-    ระบบติดตามและประเมินผล
-    
-    เวอร์ชัน: 3.0 Production
-    """)
-
-with footer_col2:
-    st.markdown("""
-    **🔗 ลิงก์ที่เป็นประโยชน์**
-    
-    [📖 คู่มือใช้งาน](#)
-    
-    [🐛 รายงานปัญหา](#)
-    """)
-
-with footer_col3:
-    st.markdown("""
-    **📞 ติดต่อ**
-    
-    IT Support Team
-    
-    📧 support@college.ac.th
-    """)
-
-# Auto refresh functionality
-if auto_refresh:
-    import time
-    time.sleep(refresh_interval * 60)
-    st.rerun()bar = px.bar(
+            fig_bar = px.bar(
                 avg_by_standard,
                 x="มาตรฐาน",
                 y="คะแนน",
@@ -673,7 +509,6 @@ elif viz_type == "🎯 เปรียบเทียบมาตรฐาน":
         
         st.dataframe(standards_comparison, use_container_width=True)
         
-        # Radar Chart
         fig_radar = go.Figure()
         
         fig_radar.add_trace(go.Scatterpolar(
@@ -683,4 +518,148 @@ elif viz_type == "🎯 เปรียบเทียบมาตรฐาน":
             name='คะแนนเฉลี่ย'
         ))
         
-        fig_
+        fig_radar.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 5]
+                )
+            ),
+            showlegend=True,
+            title="Radar Chart เปรียบเทียบมาตรฐาน",
+            template=chart_theme,
+            height=500
+        )
+        
+        st.plotly_chart(fig_radar, use_container_width=True)
+
+elif viz_type == "📋 ตารางข้อมูล":
+    st.markdown("### 📋 ข้อมูลรายละเอียด")
+    
+    filter_col1, filter_col2, filter_col3 = st.columns(3)
+    
+    with filter_col1:
+        if "มาตรฐาน" in df.columns:
+            standard_filter = st.selectbox(
+                "🎯 มาตรฐาน",
+                ["ทั้งหมด"] + list(df["มาตรฐาน"].unique())
+            )
+        else:
+            standard_filter = "ทั้งหมด"
+    
+    with filter_col2:
+        if "สถานะ" in df.columns:
+            status_filter = st.selectbox(
+                "📊 สถานะ",
+                ["ทั้งหมด"] + list(df["สถานะ"].unique())
+            )
+        else:
+            status_filter = "ทั้งหมด"
+    
+    with filter_col3:
+        if len(selected_years) > 1:
+            year_filter = st.selectbox(
+                "📅 ปี",
+                ["ทั้งหมด"] + selected_years
+            )
+        else:
+            year_filter = "ทั้งหมด"
+    
+    filtered_df = df.copy()
+    
+    if standard_filter != "ทั้งหมด":
+        filtered_df = filtered_df[filtered_df["มาตรฐาน"] == standard_filter]
+    
+    if status_filter != "ทั้งหมด":
+        filtered_df = filtered_df[filtered_df["สถานะ"] == status_filter]
+    
+    if year_filter != "ทั้งหมด":
+        filtered_df = filtered_df[filtered_df["ปี"] == year_filter]
+    
+    if not filtered_df.empty:
+        display_cols = ["ปี", "มาตรฐาน", "ภารกิจ", "คะแนน", "สถานะ"]
+        available_cols = [col for col in display_cols if col in filtered_df.columns]
+        
+        st.dataframe(
+            filtered_df[available_cols].sort_values("คะแนน", ascending=False),
+            use_container_width=True,
+            height=400
+        )
+        
+        st.info(f"📊 แสดง {len(filtered_df)} จาก {len(df)} รายการ")
+    else:
+        st.warning("ไม่พบข้อมูลที่ตรงกับเงื่อนไข")
+
+# ------------ EXPORT SECTION ----------------
+st.markdown("## 📥 ส่งออกข้อมูล")
+
+export_col1, export_col2 = st.columns(2)
+
+with export_col1:
+    if st.button("📊 ส่งออก Excel", use_container_width=True):
+        output = BytesIO()
+        
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='ข้อมูลหลัก')
+            
+            if "มาตรฐาน" in df.columns:
+                summary = df.groupby("มาตรฐาน")["คะแนน"].agg([
+                    'count', 'mean', 'min', 'max', 'std'
+                ]).round(2)
+                summary.to_excel(writer, sheet_name='สรุป')
+        
+        st.download_button(
+            label="📥 ดาวน์โหลด Excel",
+            data=output.getvalue(),
+            file_name=f"SAR_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+with export_col2:
+    if st.button("📋 ส่งออก CSV", use_container_width=True):
+        csv_data = df.to_csv(index=False, encoding='utf-8-sig')
+        
+        st.download_button(
+            label="📥 ดาวน์โหลด CSV",
+            data=csv_data,
+            file_name=f"SAR_Data_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv"
+        )
+
+# ------------ FOOTER ----------------
+st.markdown("---")
+
+footer_col1, footer_col2, footer_col3 = st.columns(3)
+
+with footer_col1:
+    st.markdown("""
+    **📊 SAR Dashboard**
+    
+    ระบบติดตามและประเมินผล
+    
+    เวอร์ชัน: 3.0 Production
+    """)
+
+with footer_col2:
+    st.markdown("""
+    **🔗 ลิงก์ที่เป็นประโยชน์**
+    
+    [📖 คู่มือใช้งาน](#)
+    
+    [🐛 รายงานปัญหา](#)
+    """)
+
+with footer_col3:
+    st.markdown("""
+    **📞 ติดต่อ**
+    
+    IT Support Team
+    
+    📧 support@college.ac.th
+    """)
+
+# Auto refresh functionality
+if auto_refresh:
+    import time
+    time.sleep(refresh_interval * 60)
+    st.rerun()
