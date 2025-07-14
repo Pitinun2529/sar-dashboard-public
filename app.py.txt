@@ -1,0 +1,686 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from io import BytesIO
+import os
+import numpy as np
+from datetime import datetime, timedelta
+import json
+
+# ------------- PRODUCTION CONFIG ----------------
+st.set_page_config(
+    page_title="SAR Dashboard - วิทยาลัยนวัตกรรมวิชาชีพ", 
+    layout="wide",
+    initial_sidebar_state="expanded",
+    page_icon="📊",
+    menu_items={
+        'Get Help': 'https://your-help-link.com',
+        'Report a bug': 'https://your-bug-report-link.com',
+        'About': """
+        # SAR Dashboard วิทยาลัยนวัตกรรมวิชาชีพ
+        
+        ระบบติดตามและประเมินผลการดำเนินงานตามมาตรฐาน
+        
+        **เวอร์ชัน:** 3.0 Multi-Year Production
+        **พัฒนาโดย:** IT Support Team
+        """
+    }
+)
+
+# Enhanced CSS for production
+st.markdown("""
+<style>
+    /* Import Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+    
+    /* Global Styles */
+    .stApp {
+        font-family: 'Prompt', sans-serif;
+    }
+    
+    .main-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        padding: 2.5rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        text-align: center;
+        color: white;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        animation: fadeIn 1s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .metric-card {
+        background: white;
+        padding: 1.8rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-left: 5px solid #667eea;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    .sidebar-section {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1.2rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #667eea;
+    }
+    
+    .info-box {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #2196f3;
+        margin: 1rem 0;
+    }
+    
+    .warning-box {
+        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #ff9800;
+        margin: 1rem 0;
+    }
+    
+    .success-box {
+        background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #4caf50;
+        margin: 1rem 0;
+    }
+    
+    /* Loading Animation */
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .main-header {
+            padding: 1.5rem;
+        }
+        .metric-card {
+            padding: 1rem;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ------------ CONFIGURATION WITH ENVIRONMENT VARIABLES ----------------
+# ใช้ Environment Variables หรือ Streamlit Secrets
+try:
+    # สำหรับ Streamlit Cloud
+    MAIN_SHEET_ID = st.secrets.get("GOOGLE_SHEET_ID", "1E5Eo7DkgY0XYxCLcY9II5vH_citjCNcCJ9QBPIAs-BY")
+except:
+    # สำหรับ Local Development
+    MAIN_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "1E5Eo7DkgY0XYxCLcY9II5vH_citjCNcCJ9QBPIAs-BY")
+
+YEARS = list(range(2567, 2579))  # 2567-2578 (12 years)
+
+# Configuration สำหรับแต่ละปี - ระบุ gid สำหรับแต่ละปี
+SHEET_CONFIGS = {
+    2567: "0",
+    2568: "391457022",
+    2569: "1262210076",
+    2570: "434200182",
+    2571: "39531981",
+    2572: "635418211",
+    2573: "35307857",
+    2574: "1330941169",
+    2575: "857387421",
+    2576: "855467636",
+    2577: "76253826",
+    2578: "1563844631",
+}
+
+# ------------ HEADER ----------------
+st.markdown("""
+<div class="main-header">
+    <h1>📊 SAR Dashboard วิทยาลัยนวัตกรรมวิชาชีพ</h1>
+    <h2>ระบบติดตามและประเมินผลตามมาตรฐาน (2567-2578)</h2>
+    <p>🚀 <strong>เวอร์ชัน Production 3.0</strong> | ระบบวิเคราะห์ข้อมูลแบบครบวงจร</p>
+</div>
+""", unsafe_allow_html=True)
+
+# ------------ ERROR HANDLING & LOGGING ----------------
+@st.cache_data(ttl=600)  # เพิ่มเวลา cache สำหรับ production
+def load_year_data_production(year):
+    """โหลดข้อมูลสำหรับปีที่กำหนด พร้อม Error Handling ขั้นสูง"""
+    try:
+        gid = SHEET_CONFIGS.get(year)
+        
+        if not gid:
+            st.error(f"⚠️ ไม่พบการกำหนดค่า gid สำหรับปี {year}")
+            return None
+        
+        # แสดง Loading State
+        with st.spinner(f'🔄 กำลังโหลดข้อมูลปี {year}...'):
+            sheet_url = f"https://docs.google.com/spreadsheets/d/{MAIN_SHEET_ID}/export?format=csv&gid={gid}"
+            
+            try:
+                df = pd.read_csv(sheet_url, encoding='utf-8')
+                
+                if df.empty:
+                    st.warning(f"⚠️ แผ่นงาน gid={gid} ว่างเปล่า")
+                    return None
+                
+                # Data Cleaning
+                df = df.dropna(subset=["ภารกิจ"])
+                df.columns = df.columns.str.strip()
+                
+                # Score Processing
+                score_column = None
+                for col in ["ระดับคะแนนแต่ละภารกิจ", "คะแนน", "Score"]:
+                    if col in df.columns:
+                        score_column = col
+                        break
+                
+                if score_column:
+                    df["คะแนน"] = pd.to_numeric(df[score_column], errors="coerce")
+                    df = df.dropna(subset=["คะแนน"])
+                else:
+                    st.error(f"❌ ไม่พบคอลัมน์คะแนนในข้อมูลปี {year}")
+                    return None
+                
+                # Standard Assignment
+                df["มาตรฐาน"] = ""
+                for idx, row in df.iterrows():
+                    actual_row = idx + 2
+                    
+                    if 2 <= actual_row <= 13:
+                        df.loc[idx, "มาตรฐาน"] = "มาตรฐานที่ 1"
+                    elif 14 <= actual_row <= 30:
+                        df.loc[idx, "มาตรฐาน"] = "มาตรฐานที่ 2"
+                    elif 31 <= actual_row <= 34:
+                        df.loc[idx, "มาตรฐาน"] = "มาตรฐานที่ 3"
+                
+                df = df[df["มาตรฐาน"] != ""]
+                df["ปี"] = year
+                
+                if not df.empty:
+                    st.success(f"✅ โหลดข้อมูลปี {year} สำเร็จ ({len(df)} รายการ)")
+                    return df
+                else:
+                    st.warning(f"⚠️ ไม่มีข้อมูลที่ใช้ได้สำหรับปี {year}")
+                    return None
+                    
+            except pd.errors.EmptyDataError:
+                st.error(f"❌ ไฟล์ข้อมูลปี {year} ว่างเปล่า")
+                return None
+            except pd.errors.ParserError as e:
+                st.error(f"❌ ข้อผิดพลาดในการอ่านข้อมูลปี {year}: {e}")
+                return None
+            except Exception as e:
+                st.error(f"❌ ข้อผิดพลาดไม่ทราบสาเหตุ: {e}")
+                return None
+                
+    except Exception as e:
+        st.error(f"❌ ข้อผิดพลาดระบบ: {e}")
+        return None
+
+# ------------ SIDEBAR CONFIGURATION ----------------
+with st.sidebar:
+    st.markdown("""
+    <div class="sidebar-section">
+        <h3>🎛️ การควบคุมแดشบอร์ด</h3>
+        <p><strong>สถานะ:</strong> 🟢 Online</p>
+        <p><strong>อัปเดต:</strong> """ + datetime.now().strftime("%d/%m/%Y %H:%M") + """</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Connection Test
+    if st.button("🔍 ทดสอบการเชื่อมต่อ", key="connection_test"):
+        with st.spinner("กำลังทดสอบ..."):
+            total_connections = 0
+            successful_connections = 0
+            
+            for year in YEARS[:3]:  # ทดสอบแค่ 3 ปีแรกเพื่อประหยัดเวลา
+                gid = SHEET_CONFIGS.get(year)
+                total_connections += 1
+                
+                try:
+                    test_url = f"https://docs.google.com/spreadsheets/d/{MAIN_SHEET_ID}/export?format=csv&gid={gid}"
+                    test_df = pd.read_csv(test_url, nrows=1)  # อ่านแค่แถวแรกเพื่อทดสอบ
+                    successful_connections += 1
+                    st.success(f"✅ ปี {year}: เชื่อมต่อสำเร็จ")
+                except:
+                    st.error(f"❌ ปี {year}: เชื่อมต่อไม่สำเร็จ")
+            
+            connection_rate = (successful_connections / total_connections * 100)
+            
+            if connection_rate == 100:
+                st.success(f"🎉 การเชื่อมต่อ: {connection_rate:.0f}% - ระบบพร้อมใช้งาน")
+            elif connection_rate >= 50:
+                st.warning(f"⚠️ การเชื่อมต่อ: {connection_rate:.0f}% - ระบบใช้งานได้บางส่วน")
+            else:
+                st.error(f"🚨 การเชื่อมต่อ: {connection_rate:.0f}% - ระบบมีปัญหา")
+    
+    st.markdown("### 📅 เลือกโหมดการวิเคราะห์")
+    
+    analysis_mode = st.radio(
+        "โหมดการดู",
+        ["📊 ปีเดียว", "📈 เปรียบเทียบหลายปี", "🔮 แนวโน้มทั้งหมด"],
+        help="เลือกรูปแบบการวิเคราะห์ข้อมูล"
+    )
+    
+    if analysis_mode == "📊 ปีเดียว":
+        selected_years = [st.selectbox("เลือกปี", YEARS, index=0)]
+    elif analysis_mode == "📈 เปรียบเทียบหลายปี":
+        selected_years = st.multiselect(
+            "เลือกปีที่ต้องการ", 
+            YEARS, 
+            default=[2567, 2568, 2569],
+            help="เลือกได้สูงสุด 5 ปี"
+        )
+        if len(selected_years) > 5:
+            st.warning("⚠️ เลือกได้สูงสุด 5 ปี")
+            selected_years = selected_years[:5]
+        if not selected_years:
+            selected_years = [2567]
+    else:
+        selected_years = YEARS
+    
+    st.markdown("### ⚙️ การตั้งค่า")
+    
+    chart_theme = st.selectbox(
+        "🎨 ธีมกราฟ", 
+        ["plotly", "plotly_white", "plotly_dark", "seaborn"],
+        index=1
+    )
+    
+    show_targets = st.checkbox("🎯 แสดงเป้าหมาย", value=True)
+    auto_refresh = st.checkbox("🔄 รีเฟรชอัตโนมัติ", value=False)
+    
+    if auto_refresh:
+        refresh_interval = st.slider("⏱️ ช่วงเวลารีเฟรช (นาที)", 5, 60, 15)
+        if st.button("🔄 รีเฟรชทันที"):
+            st.cache_data.clear()
+            st.rerun()
+
+# ------------ DATA LOADING ----------------
+def load_selected_data():
+    """โหลดข้อมูลตามปีที่เลือก"""
+    all_data = []
+    loading_progress = st.progress(0)
+    status_text = st.empty()
+    
+    for i, year in enumerate(selected_years):
+        status_text.text(f"กำลังโหลดข้อมูลปี {year}...")
+        progress = (i + 1) / len(selected_years)
+        loading_progress.progress(progress)
+        
+        year_data = load_year_data_production(year)
+        if year_data is not None and not year_data.empty:
+            all_data.append(year_data)
+    
+    loading_progress.empty()
+    status_text.empty()
+    
+    if all_data:
+        combined_df = pd.concat(all_data, ignore_index=True)
+        return combined_df
+    else:
+        return pd.DataFrame()
+
+# โหลดข้อมูล
+with st.container():
+    if len(selected_years) == 1:
+        st.info(f"📊 กำลังโหลดข้อมูลปี {selected_years[0]}")
+    else:
+        st.info(f"📈 กำลังโหลดข้อมูล {len(selected_years)} ปี")
+    
+    df = load_selected_data()
+    
+    if df.empty:
+        st.error("❌ ไม่สามารถโหลดข้อมูลได้")
+        st.markdown("""
+        <div class="warning-box">
+            <h4>💡 ข้อเสนอแนะ:</h4>
+            <ul>
+                <li>ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต</li>
+                <li>ยืนยันว่า Google Sheets เป็น Public</li>
+                <li>ทดสอบการเชื่อมต่อด้วยปุ่มในแถบด้านข้าง</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop()
+
+# ------------ SUCCESS MESSAGE ----------------
+if not df.empty:
+    total_records = len(df)
+    years_loaded = df["ปี"].nunique()
+    standards_covered = df["มาตรฐาน"].nunique()
+    
+    st.markdown(f"""
+    <div class="success-box">
+        <h4>🎉 โหลดข้อมูลสำเร็จ!</h4>
+        <p><strong>📊 ข้อมูลทั้งหมด:</strong> {total_records:,} รายการ</p>
+        <p><strong>📅 ปีที่ครอบคลุม:</strong> {years_loaded} ปี</p>
+        <p><strong>🎯 มาตรฐานที่ครอบคลุม:</strong> {standards_covered} มาตรฐาน</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ------------ MAIN DASHBOARD CONTENT ----------------
+st.markdown("## 📈 ตัวชี้วัดหลัก")
+
+# KPIs
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    total_tasks = len(df)
+    st.markdown(f"""
+    <div class="metric-card">
+        <h2 style="color: #667eea; margin: 0;">{total_tasks:,}</h2>
+        <p style="margin: 0; color: #666;">ภารกิจทั้งหมด</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    avg_score = df["คะแนน"].mean() if "คะแนน" in df.columns else 0
+    st.markdown(f"""
+    <div class="metric-card">
+        <h2 style="color: #28a745; margin: 0;">{avg_score:.2f}</h2>
+        <p style="margin: 0; color: #666;">คะแนนเฉลี่ยรวม</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+    if "สถานะ" in df.columns:
+        completed = len(df[df["สถานะ"] == "เสร็จสิ้น"])
+        completion_rate = (completed / total_tasks * 100) if total_tasks > 0 else 0
+    else:
+        completion_rate = 0
+    
+    st.markdown(f"""
+    <div class="metric-card">
+        <h2 style="color: #ffc107; margin: 0;">{completion_rate:.1f}%</h2>
+        <p style="margin: 0; color: #666;">อัตราความสำเร็จ</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col4:
+    above_target = len(df[df["คะแนน"] >= 4.0]) if "คะแนน" in df.columns else 0
+    target_rate = (above_target / total_tasks * 100) if total_tasks > 0 else 0
+    
+    st.markdown(f"""
+    <div class="metric-card">
+        <h2 style="color: #17a2b8; margin: 0;">{target_rate:.1f}%</h2>
+        <p style="margin: 0; color: #666;">เหนือเป้าหมาย</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ------------ VISUALIZATION ----------------
+st.markdown("## 📊 การวิเคราะห์ข้อมูล")
+
+# Chart selection
+viz_type = st.selectbox(
+    "เลือกประเภทการแสดงผล",
+    ["📊 ภาพรวม", "📈 แนวโน้ม", "🎯 เปรียบเทียบมาตรฐาน", "📋 ตารางข้อมูล"]
+)
+
+if viz_type == "📊 ภาพรวม":
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if "มาตรฐาน" in df.columns and "คะแนน" in df.columns:
+            avg_by_standard = df.groupby("มาตรฐาน")["คะแนน"].mean().reset_index()
+            
+            fig_radar.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 5]
+                )
+            ),
+            showlegend=True,
+            title="Radar Chart เปรียบเทียบมาตรฐาน",
+            template=chart_theme,
+            height=500
+        )
+        
+        st.plotly_chart(fig_radar, use_container_width=True)
+
+elif viz_type == "📋 ตารางข้อมูล":
+    st.markdown("### 📋 ข้อมูลรายละเอียด")
+    
+    # Filters
+    filter_col1, filter_col2, filter_col3 = st.columns(3)
+    
+    with filter_col1:
+        if "มาตรฐาน" in df.columns:
+            standard_filter = st.selectbox(
+                "🎯 มาตรฐาน",
+                ["ทั้งหมด"] + list(df["มาตรฐาน"].unique())
+            )
+        else:
+            standard_filter = "ทั้งหมด"
+    
+    with filter_col2:
+        if "สถานะ" in df.columns:
+            status_filter = st.selectbox(
+                "📊 สถานะ",
+                ["ทั้งหมด"] + list(df["สถานะ"].unique())
+            )
+        else:
+            status_filter = "ทั้งหมด"
+    
+    with filter_col3:
+        if len(selected_years) > 1:
+            year_filter = st.selectbox(
+                "📅 ปี",
+                ["ทั้งหมด"] + selected_years
+            )
+        else:
+            year_filter = "ทั้งหมด"
+    
+    # Apply filters
+    filtered_df = df.copy()
+    
+    if standard_filter != "ทั้งหมด":
+        filtered_df = filtered_df[filtered_df["มาตรฐาน"] == standard_filter]
+    
+    if status_filter != "ทั้งหมด":
+        filtered_df = filtered_df[filtered_df["สถานะ"] == status_filter]
+    
+    if year_filter != "ทั้งหมด":
+        filtered_df = filtered_df[filtered_df["ปี"] == year_filter]
+    
+    # Display filtered data
+    if not filtered_df.empty:
+        display_cols = ["ปี", "มาตรฐาน", "ภารกิจ", "คะแนน", "สถานะ"]
+        available_cols = [col for col in display_cols if col in filtered_df.columns]
+        
+        st.dataframe(
+            filtered_df[available_cols].sort_values("คะแนน", ascending=False),
+            use_container_width=True,
+            height=400
+        )
+        
+        st.info(f"📊 แสดง {len(filtered_df)} จาก {len(df)} รายการ")
+    else:
+        st.warning("ไม่พบข้อมูลที่ตรงกับเงื่อนไข")
+
+# ------------ EXPORT SECTION ----------------
+st.markdown("## 📥 ส่งออกข้อมูล")
+
+export_col1, export_col2 = st.columns(2)
+
+with export_col1:
+    if st.button("📊 ส่งออก Excel", use_container_width=True):
+        output = BytesIO()
+        
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            # Main data
+            df.to_excel(writer, index=False, sheet_name='ข้อมูลหลัก')
+            
+            # Summary
+            if "มาตรฐาน" in df.columns:
+                summary = df.groupby("มาตรฐาน")["คะแนน"].agg([
+                    'count', 'mean', 'min', 'max', 'std'
+                ]).round(2)
+                summary.to_excel(writer, sheet_name='สรุป')
+        
+        st.download_button(
+            label="📥 ดาวน์โหลด Excel",
+            data=output.getvalue(),
+            file_name=f"SAR_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+with export_col2:
+    if st.button("📋 ส่งออก CSV", use_container_width=True):
+        csv_data = df.to_csv(index=False, encoding='utf-8-sig')
+        
+        st.download_button(
+            label="📥 ดาวน์โหลด CSV",
+            data=csv_data,
+            file_name=f"SAR_Data_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv"
+        )
+
+# ------------ FOOTER ----------------
+st.markdown("---")
+
+footer_col1, footer_col2, footer_col3 = st.columns(3)
+
+with footer_col1:
+    st.markdown("""
+    **📊 SAR Dashboard**
+    
+    ระบบติดตามและประเมินผล
+    
+    เวอร์ชัน: 3.0 Production
+    """)
+
+with footer_col2:
+    st.markdown("""
+    **🔗 ลิงก์ที่เป็นประโยชน์**
+    
+    [📖 คู่มือใช้งาน](#)
+    
+    [🐛 รายงานปัญหา](#)
+    """)
+
+with footer_col3:
+    st.markdown("""
+    **📞 ติดต่อ**
+    
+    IT Support Team
+    
+    📧 support@college.ac.th
+    """)
+
+# Auto refresh functionality
+if auto_refresh:
+    import time
+    time.sleep(refresh_interval * 60)
+    st.rerun()bar = px.bar(
+                avg_by_standard,
+                x="มาตรฐาน",
+                y="คะแนน",
+                title="คะแนนเฉลี่ยแต่ละมาตรฐาน",
+                color="คะแนน",
+                color_continuous_scale="Viridis"
+            )
+            
+            fig_bar.update_layout(
+                template=chart_theme,
+                height=400,
+                yaxis=dict(range=[0, 5])
+            )
+            
+            if show_targets:
+                fig_bar.add_hline(y=4.0, line_dash="dash", line_color="red")
+            
+            st.plotly_chart(fig_bar, use_container_width=True)
+    
+    with col2:
+        if "คะแนน" in df.columns:
+            fig_hist = px.histogram(
+                df,
+                x="คะแนน",
+                nbins=20,
+                title="การกระจายคะแนน",
+                color_discrete_sequence=["#667eea"]
+            )
+            
+            fig_hist.update_layout(
+                template=chart_theme,
+                height=400
+            )
+            
+            if show_targets:
+                fig_hist.add_vline(x=4.0, line_dash="dash", line_color="red")
+            
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+elif viz_type == "📈 แนวโน้ม" and len(selected_years) > 1:
+    yearly_trend = df.groupby("ปี")["คะแนน"].mean().reset_index()
+    
+    fig_trend = px.line(
+        yearly_trend,
+        x="ปี",
+        y="คะแนน",
+        title="แนวโน้มคะแนนเฉลี่ยตามปี",
+        markers=True,
+        line_shape="spline"
+    )
+    
+    fig_trend.update_layout(
+        template=chart_theme,
+        height=500,
+        yaxis=dict(range=[0, 5])
+    )
+    
+    if show_targets:
+        fig_trend.add_hline(y=4.0, line_dash="dash", line_color="red")
+    
+    st.plotly_chart(fig_trend, use_container_width=True)
+
+elif viz_type == "🎯 เปรียบเทียบมาตรฐาน":
+    if "มาตรฐาน" in df.columns and "คะแนน" in df.columns:
+        standards_comparison = df.groupby("มาตรฐาน")["คะแนน"].agg([
+            'mean', 'median', 'std', 'count'
+        ]).round(2)
+        
+        standards_comparison.columns = ["ค่าเฉลี่ย", "ค่ามัธยฐาน", "ส่วนเบี่ยงเบน", "จำนวน"]
+        standards_comparison = standards_comparison.reset_index()
+        
+        st.dataframe(standards_comparison, use_container_width=True)
+        
+        # Radar Chart
+        fig_radar = go.Figure()
+        
+        fig_radar.add_trace(go.Scatterpolar(
+            r=standards_comparison["ค่าเฉลี่ย"],
+            theta=standards_comparison["มาตรฐาน"],
+            fill='toself',
+            name='คะแนนเฉลี่ย'
+        ))
+        
+        fig_
