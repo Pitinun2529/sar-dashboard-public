@@ -653,9 +653,9 @@ with footer_col3:
     st.markdown("""
     **📞 ติดต่อ**
     
-    IT Support Team
+    ฝ่ายแผนและงานประกันคุณภาพ
     
-    📧 support@college.ac.th
+    📧 piinun.va@rmuti.ac.th
     """)
 
 # Auto refresh functionality
